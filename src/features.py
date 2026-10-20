@@ -33,7 +33,7 @@ WHICH ONES YOU MUST IMPLEMENT
 """
 from pathlib import Path
 
-import numpy as np
+import numpy as np 
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -74,14 +74,9 @@ def recent(history, window=RECENT_WINDOW, decision_month=DECISION_MONTH):
 # GUIDED EXAMPLE (Lab 2, part 1)  family: FREQUENCY
 # --------------------------------------------------------------------------
 def claims_per_month(history):
-    """Prior at-fault claims per month over the 24 months before the decision.
-
-    Steps (also on the slides):
-      1. h = as_of(history)                       keep months 1..24 only
-      2. total = h.groupby("policy_id")["claim_filed"].sum()
-      3. return total / DECISION_MONTH            a rate, so it is a FREQUENCY
-    """
-    return None   # LAB 2: replace this line with the three steps above
+    h = as_of(history)
+    total = h.groupby("policy_id")["claim_filed"].sum()
+    return total / DECISION_MONTH
 
 
 # --------------------------------------------------------------------------
@@ -96,11 +91,20 @@ def months_since_last_claim(history):
 
 
 def speeding_velocity(history):
-    """VELOCITY: speeding events per 1,000 miles in the recent window, divided
-    by speeding events per 1,000 miles over the whole 24 months.
-    Add a small constant to the denominator so a driver with zero baseline
-    events does not produce infinity."""
-    return None
+    # Velocity family: recent (months 19-24) vs baseline (months 1-24)
+    h_recent = recent(history)
+    h_all = as_of(history)
+    
+    rec_events = h_recent.groupby("policy_id")["speeding_events"].sum()
+    rec_miles = h_recent.groupby("policy_id")["miles"].sum()
+    all_events = h_all.groupby("policy_id")["speeding_events"].sum()
+    all_miles = h_all.groupby("policy_id")["miles"].sum()
+    
+    rec_rate = (rec_events / rec_miles.replace(0, np.nan)).fillna(0) * 1000
+    all_rate = (all_events / all_miles.replace(0, np.nan)).fillna(0) * 1000
+    
+    # 0.1 stabilizer prevents division-by-zero infinity trap
+    return rec_rate / (all_rate + 0.1)
 
 
 def miles_volatility(history):
@@ -110,20 +114,37 @@ def miles_volatility(history):
 
 
 def max_hard_brakes_per_1k(history):
-    """EXTREMES: the single worst month, measured as hard brakes per 1,000
-    miles in that month, over the 24 months."""
-    return None
+    # Trend family: rate in months 13-24 minus rate in months 1-12
+    h = as_of(history)
+    m1_12 = h[h["month"] <= 12]
+    m13_24 = h[(h["month"] >= 13) & (h["month"] <= 24)]
+    
+    rate_early = (m1_12.groupby("policy_id")["hard_brakes"].sum() / 
+                  m1_12.groupby("policy_id")["miles"].sum().replace(0, np.nan)).fillna(0) * 1000
+    rate_late = (m13_24.groupby("policy_id")["hard_brakes"].sum() / 
+                 m13_24.groupby("policy_id")["miles"].sum().replace(0, np.nan)).fillna(0) * 1000
+    
+    return rate_late - rate_early
 
 
 def hard_brake_trend(history):
-    """TREND: hard brakes per 1,000 miles in months 13..24 minus hard brakes
-    per 1,000 miles in months 1..12. Positive means getting worse."""
-    return None
+    # Trend family: rate in months 13-24 minus rate in months 1-12
+        h = as_of(history)
+        m1_12 = h[h["month"] <= 12]
+        m13_24 = h[(h["month"] >= 13) & (h["month"] <= 24)]
+        
+        rate_early = (m1_12.groupby("policy_id")["hard_brakes"].sum() / 
+                      m1_12.groupby("policy_id")["miles"].sum().replace(0, np.nan)).fillna(0) * 1000
+        rate_late = (m13_24.groupby("policy_id")["hard_brakes"].sum() / 
+                     m13_24.groupby("policy_id")["miles"].sum().replace(0, np.nan)).fillna(0) * 1000
+        
+        return rate_late - rate_early
 
 
 def night_share_mean(history):
-    """RATIO: average share of miles driven at night over the 24 months."""
-    return None
+    # Ratio family: mean of night_miles_share per driver
+    h = as_of(history)
+    return h.groupby("policy_id")["night_miles_share"].mean()
 
 
 # --------------------------------------------------------------------------
